@@ -28,6 +28,9 @@ class ComeetValidator(BaseValidator):
         options.add_argument("--headless")
         options.add_argument("--no-sandbox")
         options.add_argument("--disable-dev-shm-usage")
+        options.add_argument("--disable-gpu")
+        options.add_argument("--window-size=1920,1080")
+        options.add_argument("--ignore-certificate-errors")
         return webdriver.Chrome(options=options)
     
     def is_page_full_loaded(self):
@@ -49,7 +52,7 @@ class ComeetValidator(BaseValidator):
         except Exception as e:
             logger.error(f"Comeet Validation error: {e}")
             return False
-        
+      
     def extract_metadata(self) -> dict:
         metadata = {
             "title": None,

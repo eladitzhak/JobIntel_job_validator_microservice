@@ -59,7 +59,7 @@ class JobValidatorService:
                     "title", "location", "company", 
                     "description", "posted_time", "requirements"
             ])
-        
+
             # for key in ["title", "location", "company", "description", "posted_time", "requirements"]:
             #     if hasattr(job, key) and key in metadata:
             #         setattr(job, key, metadata[key])
@@ -93,6 +93,8 @@ class JobValidatorService:
                 key in metadata and
                 metadata[key] is not None
             ):
+                current_value = getattr(job, key)
+                new_value = metadata[key]
                 if key == "posted_time":
                     # Convert to datetime object if it's a string
                     if isinstance(metadata[key], str):
@@ -100,7 +102,10 @@ class JobValidatorService:
                             metadata[key] = datetime.strptime(metadata[key], "%Y-%m-%d %H:%M:%S")
                         except ValueError:
                             pass
-                setattr(job, key, metadata[key])
+                if current_value != new_value:
+                    logger.info(f"Updating {key} from {current_value} to {new_value}")
+                    # Update the job object with the new value
+                    setattr(job, key, metadata[key])
 
 
 
