@@ -1,6 +1,6 @@
 import requests
 from bs4 import BeautifulSoup
-from app.job_validator.base import BaseValidator
+from app.validators.base import BaseValidator
 from datetime import datetime
 
 class GreenhouseValidator(BaseValidator):

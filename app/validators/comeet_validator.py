@@ -10,7 +10,7 @@ from selenium.webdriver.support import expected_conditions as EC
 from bs4 import BeautifulSoup
 from app.log_config import logger
 
-from app.job_validator.base import BaseValidator
+from app.validators.base import BaseValidator
 
 WAIT_TIME_TO_LOAD_PAGE = 15  # seconds
 EXPECTED_SELECTOR = "h1, button"
