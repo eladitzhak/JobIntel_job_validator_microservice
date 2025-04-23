@@ -20,7 +20,7 @@ app = FastAPI()
 
 @app.get("/")
 def read_root():
-    return {"Hello": "World"}
+    return { "message": "Welcome to the Job Validator API!" }
 
 
 ###For testing only
