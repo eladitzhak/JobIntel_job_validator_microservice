@@ -9,6 +9,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from bs4 import BeautifulSoup
 from app.log_config import logger
+from selenium.webdriver.chrome.webdriver import WebDriver
 
 from app.validators.base import BaseValidator
 
@@ -20,9 +21,19 @@ class ComeetValidator(BaseValidator):
  
     def __init__(self, url: str):
         super().__init__(url)
-        self.driver = self._init_driver()
-        self.wait = WebDriverWait(self.driver, WAIT_TIME_TO_LOAD_PAGE)
-    
+        # self.driver = self._init_driver()
+        # self.wait = WebDriverWait(self.driver, WAIT_TIME_TO_LOAD_PAGE)
+        self.driver = None
+        self.wait = None
+
+    def uses_driver(self) -> bool:
+        return True
+
+    def set_driver(self, driver: WebDriver):
+        self.driver = driver
+        self.wait = WebDriverWait(driver, WAIT_TIME_TO_LOAD_PAGE)
+        
+
     def _init_driver(self):
         options = Options()
         options.add_argument("--headless")
@@ -172,8 +183,18 @@ class ComeetValidator(BaseValidator):
             
             # metadata["responsibilities"] = extract_section("Responsibilities")
             # metadata["requirements"] = extract_section("Requirements")
-
+        except Exception as e:
+            logger.error(f"Error extracting metadata from Comeet: {e}")
+            metadata = {
+                "title": None,
+                "company": None,
+                "location": None,
+                "posted_time": None,
+                "description": None,
+                "requirements": None,
+                "responsibilities": None,
+            }
         finally:
-            self.driver.quit()
+                return metadata
 
-        return metadata
+

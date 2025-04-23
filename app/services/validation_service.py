@@ -8,7 +8,8 @@ from app.validators.factory import ValidatorFactory
 from app.config import settings
 from app.log_config import logger  
 from app.utils.db_utils import commit_or_rollback
-
+from app.utils.chrome_driver_manger import DriverManager
+#TODO:INJECT DEPENDS(get_db)?
 class JobValidatorService:
     def __init__(self, db_session):
         self.db = db_session or SessionLocal()
@@ -19,26 +20,85 @@ class JobValidatorService:
         """
         Validate pending jobs in the database.
         """
+
         pending_jobs = self.db.query(JobPost).filter(
             JobPost.validated.is_(False),
             JobPost.status == "pending",
-            JobPost.link.contains("comeet"),
+            # JobPost.link.contains("comeet"),
         ).limit(5).all()
+
         if not pending_jobs:
             logger.error("No pending jobs to validate.")
             return
+        
+        with DriverManager() as driver_manager:
+            for job in pending_jobs:
+                logger.info(f"🔍 Validating: {job.link} id: {job.id}")
+                
+                try:
+                    validator = ValidatorFactory.create_validator(job.link)
+                except Exception as e:
+                    logger.warning(f"❌ No validator implemented for: {job.link}")
+                    with commit_or_rollback(self.db, job):
+                        job.status = "no validator"
+                        job.validated_date = datetime.now(self.israel_tz)
+                    continue
+                if not validator:
+                    logger.warning(f"⚠️ No validator for: {job.link}")
+                    with commit_or_rollback(self.db, job):
+                        job.status = "no validator error"
+                        job.validated_date = datetime.now(self.israel_tz)
+                    continue
+                if validator.uses_driver():
+                    try:
+                        shared_driver = driver_manager.get_or_create(validator)
+                        validator.set_driver(shared_driver)
+                    except Exception as e:
+                        logger.error(f"🚫 Could not attach driver: {e}")
+                        with commit_or_rollback(self.db, job):
+                            job.status = "driver error"
+                            job.validated_date = datetime.now(self.israel_tz)
+                        continue
 
-        for job in pending_jobs:
-            logger.info(f"🔍 Validating: {job.link} id: {job.id}")
-            if self.validate_job(job):
-                logger.info(f"✅ Job validated: {job.link} id: {job.id}")
-            else: 
-                logger.error(f"❌ Job validation failed: {job.link} id: {job.id}")
+                    if not self.validate_job(job, validator):
+                        logger.warning(f"❌ Job validation failed: {job.link}")
+                    else:
+                        logger.info(f"✅ Job validated: {job.link}")
+            return self.results
 
-    def validate_job(self, job: JobPost) -> bool:
+###version 1 of driver pool
+        # try:
+        #     for job in pending_jobs:
+        #         logger.info(f"🔍 Validating: {job.link} id: {job.id}")
+                
+        #         validator = ValidatorFactory.create_validator(job.link)
+
+        #         if validator and validator.uses_driver():
+        #             validator_type = type(validator).__name__.lower()
+        #             if validator_type not in driver_pool:
+        #                 driver_pool[validator_type] = validator._init_driver()
+        #                 logger.info(f"🚗 Created shared driver for {validator_type}")
+
+        #             validator.set_driver(driver_pool[validator_type])
+
+        #         if self.validate_job(job, validator):
+        #             logger.info(f"✅ Job validated: {job.link} id: {job.id}")
+        #         else: 
+        #             logger.error(f"❌ Job validation failed: {job.link} id: {job.id}")
+        # except Exception as e:
+        #     logger.error(f"An error occurred during job validation: {e}")
+        # finally:
+        #     for driver in driver_pool.values():
+        #         try:
+        #             driver.quit()
+        #         except Exception:
+        #             logger.warning("⚠️ Failed to quit one of the shared drivers")
+    
+    # def validate_job(self, job: JobPost) -> bool:
+    def validate_job(self, job: JobPost, validator=None) -> bool:
         metadata = {}
         try:
-            validator = ValidatorFactory.create_validator(job.link)
+            # validator = ValidatorFactory.create_validator(job.link)
             if not validator:
                 logger.warning(f"⚠️ No validator for: {job.link}")
                 with commit_or_rollback(self.db, job):

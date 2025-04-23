@@ -9,6 +9,21 @@ class BaseValidator(ABC):
     def __init__(self, url: str):
         self.url = url
 
+    def uses_driver(self) -> bool:
+        """
+        Whether this validator needs a shared WebDriver (Selenium).
+        Override in subclasses.
+        """
+        return False
+        # Default implementation returns False. Override in subclasses if needed.   
+    
+    def set_driver(self, driver):
+        """
+        Injects a shared Selenium driver (if uses_driver returns True).
+        Override in subclasses that use Selenium.
+        """
+        pass
+
     @abstractmethod
     def validate(self) -> bool:
         """
