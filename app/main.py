@@ -5,6 +5,7 @@
 # print("DATABASE_URL =", os.getenv("DATABASE_URL"))
 from app.config import settings
 
+
 from fastapi import FastAPI, Depends
 from sqlalchemy.orm import Session
 from sqlalchemy import text
@@ -24,12 +25,12 @@ def read_root():
 
 ###For testing only
 
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
+# def get_db():
+#     db = SessionLocal()
+#     try:
+#         yield db
+#     finally:
+#         db.close()
 
 @app.get("/health/db")
 def db_health_check(db: Session = Depends(get_db)):

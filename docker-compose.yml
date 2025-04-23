@@ -1,0 +1,13 @@
+version: "3.9"
+
+services:
+  job-validator:
+    build:
+      context: .
+    ports:
+      - "8002:8000" #- "<host_port>:<container_port>" --> http://localhost:8002/docs
+    env_file:
+      - .env
+    volumes:
+      - .:/app                  # 🔧 mount entire project including `app/`
+
