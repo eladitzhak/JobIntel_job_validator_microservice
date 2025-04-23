@@ -54,8 +54,13 @@ def db_health_check_basic(db: Session = Depends(get_db)):
         # Just a simple query to check DB connection
         # result = db.execute(text("SELECT 1"))
         result = db.execute(text("SELECT * from JOB_POSTS limit 1"))
+        row = result.fetchone()
+        return {
+            "status": "ok",
+            "db": "connected",
+            "result": dict(row._mapping) if row else "No rows"
+        }
 
-        return {"status": "ok", "db": "connected","result": result}
     except Exception as e:
         logger.exception("❌ DB connection failed")
         return {"status": "error", "db": "not connected", "error": str(e)}
