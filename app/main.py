@@ -139,5 +139,6 @@ def validate_specific_job(job_id: int, db: Session = Depends(get_db)):
         "update_success": result,
         "fields_updated": job.fields_updated,
         "notes": job.validation_notes,
-        "job_link": service.results[0].get('link') or job.link,
+        "job_link": job.link,
+
     }
