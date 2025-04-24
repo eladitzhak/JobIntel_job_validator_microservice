@@ -17,6 +17,12 @@ print("DEBUG =", os.getenv("DEBUG"))
 from app.config import settings
 
 print("🔎 settings.DEBUG =", settings.DEBUG)
+print(f"🧪 DEBUGPY = {settings.DEBUGPY}")
+print(f"🔁 Uvicorn --reload active? {'--reload' in os.getenv('UVICORN_RELOAD', '')}")
+if settings.UVICORN_RELOAD:
+    print("🧪 DEV mode: auto-reloading enabled")
+else:
+    print("🚀 PROD mode: running stable server")
 
 from app.config import settings
 
