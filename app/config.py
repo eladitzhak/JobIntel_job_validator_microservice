@@ -10,6 +10,7 @@ class Settings(BaseSettings):
     DATABASE_URL: PostgresDsn
     CLIENT_ID: str = "job-validator"
     DEBUG: bool = True
+    DEBUGPY: bool = True
     ISRAEL_TZ: str = "Asia/Jerusalem"
 
     class Config:

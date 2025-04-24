@@ -33,5 +33,9 @@ class JobPost(Base):
     description = Column(Text, nullable=True)
     responsibilities = Column(Text, nullable=True)
 
+    fields_updated = Column(ARRAY(String))
+    last_validated_by = Column(String)
+    validation_notes = Column(Text)
+
 
     is_user_reported = Column(Boolean, default=False)  # Keep for fast filtering

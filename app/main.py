@@ -3,6 +3,15 @@
 # load_dotenv()
 # print("ENV FILE FOUND?", os.path.exists(".env"))
 # print("DATABASE_URL =", os.getenv("DATABASE_URL"))
+import os
+from dotenv import load_dotenv
+load_dotenv()
+print("ENV FILE FOUND?", os.path.exists(".env"))
+print("DEBUG =", os.getenv("DEBUG"))
+from app.config import settings
+
+print("🔎 settings.DEBUG =", settings.DEBUG)
+
 from app.config import settings
 
 
@@ -14,7 +23,22 @@ from app.db.session import get_db
 from app.log_config import logger
 from app.services.validation_service import JobValidatorService
 from app.db.session import SessionLocal
+print("🔎 settinssgs.DEBUG =", settings.DEBUG)
 
+if os.getenv("DEBUGPY", "false").lower() == "true":
+    try:
+        import debugpy
+        print("🪲 debugpy imported!")
+        debugpy.listen(("0.0.0.0", 5678))
+
+        if not debugpy.is_client_connected():
+            print("🛑 Waiting for debugger... (non-blocking)")
+            import threading
+            threading.Thread(target=debugpy.wait_for_client, daemon=True).start()
+        else:
+            print("✅ Debugger already attached.")
+    except Exception as e:
+        print(f"❌ debugpy failed: {e}")
 
 app = FastAPI()
 
