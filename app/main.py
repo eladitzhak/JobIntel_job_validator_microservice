@@ -124,11 +124,11 @@ def validate_specific_job(job_id: int, db: Session = Depends(get_db)):
             try:
                 shared_driver = driver_manager.get_or_create(validator)
                 validator.set_driver(shared_driver)
-                result = service.validate_job(job, validator)
-
             except Exception as e:
                 logger.error(f"🚫 Could not attach driver: {e}")
                 raise HTTPException(status_code=500, detail="Driver error")
+                
+        result = service.validate_job(job, validator)
 
     # Step 5: Return result
     return {
