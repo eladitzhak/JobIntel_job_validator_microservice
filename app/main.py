@@ -7,6 +7,7 @@ import os
 from dotenv import load_dotenv
 
 from app.models.job_post import JobPost
+from app.schemas.job_post_schema import JobPostUpdate, JobValidationResult
 from app.utils.chrome_driver_manger import DriverManager
 
 from app.validators.factory import ValidatorFactory
@@ -103,7 +104,7 @@ def validate():
     results = service.validate_pending_jobs()
     return {"results": results}
     
-@app.post("/validate/{job_id}")
+@app.post("/validate/{job_id}",response_model=JobValidationResult)
 def validate_specific_job(job_id: int, db: Session = Depends(get_db)):
     # Step 1: Load job from DB
     job = db.query(JobPost).filter(JobPost.id == job_id).first()
@@ -129,16 +130,13 @@ def validate_specific_job(job_id: int, db: Session = Depends(get_db)):
                 raise HTTPException(status_code=500, detail="Driver error")
                 
         result = service.validate_job(job, validator)
-
-    # Step 5: Return result
-    return {
-        "job_id": job.id,
-        "validated_by": type(validator).__name__,
-        "status": job.status,
-        "validated_date": job.validated_date.isoformat() if job.validated_date else None,
-        "update_success": result,
-        "fields_updated": job.fields_updated,
-        "notes": job.validation_notes,
-        "job_link": job.link,
-
-    }
+        return JobValidationResult(
+            job_id=job.id,
+            validated_by=type(validator).__name__,
+            status=job.status,
+            validated_date=job.validated_date.isoformat() if job.validated_date else None,
+            update_success=result,
+            fields_updated=job.fields_updated or [],
+            notes=job.validation_notes,
+            job_link=service.results[0].get('link') if service.results else job.link,
+        )

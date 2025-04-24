@@ -36,3 +36,14 @@ class JobPostUpdate(BaseModel):
         "from_attributes": True, 
         "extra": "forbid"
     }
+
+class JobValidationResult(BaseModel):
+    job_id: int
+    validated_by: Optional[str]
+    status: Optional[str]
+    validated_date: Optional[str]
+    update_success: bool
+    fields_updated: Optional[List[str]]
+    notes: Optional[str]
+    job_link: str
+
