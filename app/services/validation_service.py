@@ -1,7 +1,10 @@
 from sqlalchemy.orm import Session
 from datetime import datetime
 import pytz
+from pydantic import ValidationError
 
+
+from app.schemas.job_post_schema import JobPostUpdate
 from app.models.job_post import JobPost
 from app.db.session import SessionLocal
 from app.validators.factory import ValidatorFactory
@@ -115,11 +118,14 @@ class JobValidatorService:
 
             metadata = validator.extract_metadata()
             logger.debug(f"📦 Metadata: {metadata}")
+            # self.apply_metadata(job, metadata, [
+            #         "title", "location", "company", 
+            #         "description", "posted_time", "requirements"
+            # ])
             self.apply_metadata(job, metadata, [
-                    "title", "location", "company", 
-                    "description", "posted_time", "requirements"
-            ])
-
+                "title", "location", "company", 
+                "description", "posted_time", "requirements"
+            ], validator)
             # for key in ["title", "location", "company", "description", "posted_time", "requirements"]:
             #     if hasattr(job, key) and key in metadata:
             #         setattr(job, key, metadata[key])
@@ -146,26 +152,63 @@ class JobValidatorService:
         for job in jobs:
             self.validate_job(job)
 
-    def apply_metadata(self,job, metadata, fields):
-        for key in fields:
-            if (
-                hasattr(job, key) and 
-                key in metadata and
-                metadata[key] is not None
-            ):
-                current_value = getattr(job, key)
-                new_value = metadata[key]
-                if key == "posted_time":
-                    # Convert to datetime object if it's a string
-                    if isinstance(metadata[key], str):
-                        try:
-                            metadata[key] = datetime.strptime(metadata[key], "%Y-%m-%d %H:%M:%S")
-                        except ValueError:
-                            pass
-                if current_value != new_value:
-                    logger.info(f"Updating {key} from {current_value} to {new_value}")
-                    # Update the job object with the new value
-                    setattr(job, key, metadata[key])
+    def apply_metadata(self,job: JobPost, metadata: dict, fields: list[str], validator=None):
+        """ Apply metadata to the job object.
+        Args:
+            job (JobPost): The job object to update.
+            metadata (dict): The metadata dictionary containing new values.
+            fields (list[str]): List of fields to update in the job object.
+        """
+        metadata = {k: v for k, v in metadata.items() if k in fields and v is not None}
+        logger.debug(f"metadata before pydantic: {metadata}")
+        try:
+            validated = JobPostUpdate(**metadata)
+            logger.debug(f"metadata after pydantic JobPostUpdate validated var name: {validated}")
+
+            updates = validated.model_dump(exclude_unset=True)
+            logger.debug(f"Applying updates to keys {updates.keys()}: {updates}")
+
+            updated_fields = []
+            
+            for key, new_value  in updates.items():
+                if key == "posted_time" and isinstance(new_value, str):
+                    try:
+                        new_value = datetime.strptime(new_value, "%Y-%m-%d %H:%M:%S")
+                    except ValueError:
+                        continue
+                if hasattr(job, key) and getattr(job, key) != new_value:
+                    logger.info(f"Updating {key} from {getattr(job, key)} to {new_value}")
+                    setattr(job, key, new_value)
+                    updated_fields.append(key)
+            # Optional: track what was updated
+            job.fields_updated = updated_fields
+            job.last_validated_by = type(validator).__name__ if validator else "unknown"
+
+
+        except ValidationError as e:
+            logger.warning(f"⚠️ Skipping update for job {job.id} due to validation: {e}")
+            job.status = "error"
+            job.validation_notes = str(e)
+
+        # for key in fields:
+        #     if (
+        #         hasattr(job, key) and 
+        #         key in metadata and
+        #         metadata[key] is not None
+        #     ):
+        #         current_value = getattr(job, key)
+        #         new_value = metadata[key]
+        #         if key == "posted_time":
+        #             # Convert to datetime object if it's a string
+        #             if isinstance(metadata[key], str):
+        #                 try:
+        #                     metadata[key] = datetime.strptime(metadata[key], "%Y-%m-%d %H:%M:%S")
+        #                 except ValueError:
+        #                     pass
+        #         if current_value != new_value:
+        #             logger.info(f"Updating {key} from {current_value} to {new_value}")
+        #             # Update the job object with the new value
+        #             setattr(job, key, metadata[key])
 
 
 
