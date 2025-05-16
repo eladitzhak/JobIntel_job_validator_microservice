@@ -170,3 +170,4 @@ cython_debug/
 *.history
 .history/
 history/
+app/validators/comeet_validator - Copy.py

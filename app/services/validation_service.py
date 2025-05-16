@@ -1,6 +1,7 @@
 from sqlalchemy.orm import Session
 from datetime import datetime
 import pytz
+from urllib.parse import urlparse
 from pydantic import ValidationError
 
 
@@ -19,6 +20,16 @@ class JobValidatorService:
         self.results = []
         self.israel_tz = pytz.timezone("Israel")
 
+    def is_company_page(self, url: str) -> bool:
+        """
+        Check if the URL is a company page and not specific job page.
+        """
+        # Example logic: check if the URL contains "company"
+        # Check URL pattern
+        path_parts = urlparse(url).path.strip('/').split('/')
+        if len(path_parts) == 3:
+            return True
+        
     def validate_pending_jobs(self):
         """
         Validate pending jobs in the database.
@@ -28,7 +39,7 @@ class JobValidatorService:
             JobPost.validated.is_(False),
             JobPost.status == "pending",
             JobPost.link.contains("comeet"),
-        ).limit(5).all()
+        ).limit(2).all()
 
         if not pending_jobs:
             logger.error("No pending jobs to validate.")
@@ -52,6 +63,11 @@ class JobValidatorService:
                         job.status = "no validator error"
                         job.validated_date = datetime.now(self.israel_tz)
                     continue
+                if (isCompanyPage := self.is_company_page(job.link)) is not None:
+                    logger.info(f"Company page detected: {isCompanyPage}")
+                    with commit_or_rollback(self.db, job):
+                        job.status = "company page"
+                        job.validated_date = datetime.now(self.israel_tz)
                 if validator.uses_driver():
                     try:
                         shared_driver = driver_manager.get_or_create(validator)
@@ -62,7 +78,7 @@ class JobValidatorService:
                             job.status = "driver error"
                             job.validated_date = datetime.now(self.israel_tz)
                         continue
-
+                    
                     if not self.validate_job(job, validator):
                         logger.warning(f"❌ Job validation failed: {job.link}")
                     else:
@@ -111,8 +127,13 @@ class JobValidatorService:
 
             if not validator.validate():
                 logger.warning(f"❌ Validation failed: {job.link} id: {job.id}")
+                if self.is_company_page(validator.driver.current_url):
+                    logger.info(f"Company page detected: {validator.driver.current_url}")
+                    job_status = "company page"
+                else:
+                    job_status = "error"
                 with commit_or_rollback(self.db, job):
-                    job.status = "error"
+                    job.status = job_status
                     job.validated_date = datetime.now(self.israel_tz)
                 return False
 

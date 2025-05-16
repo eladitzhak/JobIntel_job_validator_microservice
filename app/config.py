@@ -16,6 +16,8 @@ class Settings(BaseSettings):
     # DEBUG FOR LOCAL ENVIRONMENT
     UVICORN_RELOAD: Optional[str] = Field(default=None, alias="UVICORN_RELOAD")
 
+    openai_api_key: str = Field(..., alias="OPENAI_API_KEY")
+
     class Config:
         env_file = ".env"
 
