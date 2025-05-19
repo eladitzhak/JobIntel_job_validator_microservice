@@ -11,12 +11,12 @@ from bs4 import BeautifulSoup
 from app.log_config import logger
 from selenium.webdriver.chrome.webdriver import WebDriver
 from bs4 import BeautifulSoup
-from app.services.gpt_fallback import gpt_extract_job_metadata_from_html
+from app.services.gpt_fallback import gpt_extract_job_metadata_from_html, summarize_job_description
 from datetime import datetime
 import pytz
 import re
 import json
-
+import bleach
 
 from app.validators.base import BaseValidator
 
@@ -40,6 +40,31 @@ class ComeetValidator(BaseValidator):
         self.driver = driver
         self.wait = WebDriverWait(driver, WAIT_TIME_TO_LOAD_PAGE)
 
+    def bleach_clean(self, html, tags=None, attributes=None) -> str: 
+        """
+        Clean HTML using bleach to remove unwanted tags and attributes.
+        Sanitize while keeping formatting.
+        Accepts either a string or a BeautifulSoup Tag.
+        """
+        ALLOWED_TAGS = ["p", "br", "ul", "ol", "li", "b", "strong", "em", "h3", "h4"]
+        ALLOWED_ATTRS = {}
+
+        if not html:
+            return ""
+
+        try:
+            if hasattr(html, "prettify"):  # it's a Tag
+                html = str(html)
+            cleaned_html = bleach.clean(
+                html, 
+                tags=tags or  ALLOWED_TAGS,
+                attributes= attributes or ALLOWED_ATTRS,
+                strip=True,
+                )
+            return cleaned_html
+        except Exception as e:
+            logger.error(f"Error cleaning HTML with bleach: {e}")
+            return html  # Fallback: return original HTML if cleaning fails
 
     def _init_driver(self):
         options = Options()
@@ -153,7 +178,7 @@ class ComeetValidator(BaseValidator):
         if json_ld:
             hiring_org = json_ld.get("hiringOrganization", {})
             if isinstance(hiring_org, dict):
-                return hiring_org.get("name")
+                return hiring_org.get("name").capitalize()
         # Fallback to extracting from URL
         path_parts = urlparse(url).path.strip("/").split("/")
         if len(path_parts) >= 2:
@@ -226,8 +251,64 @@ class ComeetValidator(BaseValidator):
                     return [li.get_text(strip=True) for li in ul.find_all("li")]
                 div = tag.find_next_sibling("div")
                 if div:
-                    return div.get_text(strip=True)
+                    # return div.get_text(strip=True)
+                    return div #return raw html
         return None
+
+    def extract_text_from_gpt(self, html_for_gpt: str) -> dict:
+        """
+        1. Uses OpenAI API to extract structured job fields from full HTML.
+        2. Preserves HTML tags in each section.
+        3. Returns a dictionary with the extracted fields.
+        4. Handles token usage tracking (optional).
+        5. Handles exceptions and logs errors.
+     Uses OpenAI API to extract structured job fields from full HTML,
+        preserving HTML tags in each section.
+    """
+        prompt = """
+    Extract the following fields from the HTML job post. Return a JSON object with keys:
+
+    - title (plain text)
+    - company (plain text)
+    - location (plain text, city or city + country)
+    - posted_date (ISO format if available, or leave null)
+    - description (HTML — include only the overview/about section)
+    - responsibilities (HTML — use <ul>/<li> structure if possible)
+    - requirements (HTML — use <ul>/<li> if present, preserve formatting)
+
+    ⚠️ Keep HTML structure inside each field — do not convert to plain text or Markdown.
+    Do not repeat the same content in multiple fields.
+
+    HTML:
+    """ + html_for_gpt[:12000]
+
+        try:
+            gpt_result = gpt_extract_job_metadata_from_html(html_for_gpt, prompt)
+
+            # 💵 Token usage tracking (optional)
+            usage = gpt_result.get("usage")
+            if usage:
+                pricing = {"input": 0.0005, "output": 0.0015}
+                gpt_cost_usd = (
+                    usage["prompt_tokens"] * pricing["input"] +
+                    usage["completion_tokens"] * pricing["output"]
+                ) / 1000
+                print(f"💵 GPT used: {usage['total_tokens']} tokens → ${gpt_cost_usd:.5f}")
+
+            return {
+                "title": gpt_result.get("title"),
+                "company": gpt_result.get("company"),
+                "location": gpt_result.get("location"),
+                "posted_date": gpt_result.get("posted_date"),
+                "description": gpt_result.get("description"),
+                "responsibilities": gpt_result.get("responsibilities"),
+                "requirements": gpt_result.get("requirements"),
+            }
+
+        except Exception as e:
+            logger.error(f"❌ GPT extraction failed: {e}")
+            return {}
+
 
     def get_description(self,soup, json_ld):
         """
@@ -235,17 +316,24 @@ class ComeetValidator(BaseValidator):
         """
         if json_ld and json_ld.get("description"):
             # Clean illegal characters: remove unescaped newlines inside strings
-            safe_text = re.sub(r'(?<!\\)[\r\n]+', r' ', json_ld.get("description"))
-            if safe_text:
-                # Decode JSON safely
-                try:
-                    decoder = json.JSONDecoder()
-                    job_json, _ = decoder.raw_decode(safe_text.strip())
-                    return job_json
-                except (json.JSONDecodeError, ValueError) as e:
-                    logger.error(f"Failed to parse cleaned JSON-LD: {e}")
+            # safe_text = re.sub(r'(?<!\\)[\r\n]+', r' ', json_ld.get("description"))
+            # if safe_text:
+            #     # Decode JSON safely
+            #     try:
+            #         decoder = json.JSONDecoder()
+            #         job_json, _ = decoder.raw_decode(safe_text.strip())
+
+            #         return job_json
+            #     except (json.JSONDecodeError, ValueError) as e:
+            #         logger.error(f"Failed to parse cleaned JSON-LD: {e}")
             description = json_ld.get("description")
-            if description:
+            if description:  #You can use bleach.clean(html, tags=ALLOWED_TAGS, attributes=ALLOWED_ATTRS).
+                
+                ALLOWED_TAGS = ["p", "br", "ul", "ol", "li", "b", "strong", "em", "h3", "h4","br"]
+
+                cleaned_description = self.bleach_clean(description, tags=ALLOWED_TAGS, attributes={})
+                
+                return cleaned_description.strip() or description
                 return BeautifulSoup(description, "html.parser").get_text(separator="\n", strip=True)
         # Fallback to HTML parsing
         description_section = soup.find("div", class_="description")
@@ -258,29 +346,38 @@ class ComeetValidator(BaseValidator):
         Extracts the responsibilities section from HTML.
         """
         responsibilities_heading = soup.find(
-            lambda tag: tag.name in ["h2", "h3", "strong", "b"] and "responsibilities" in tag.get_text(strip=True).lower()
+            lambda tag: tag.name in ["h2", "h3", "strong", "b"] and "responsibilit" in tag.get_text(strip=True).lower()
         )
         if responsibilities_heading:
-            ul = responsibilities_heading.find_next_sibling("ul")
+            # If heading is within <p>, get that <p> and then find next <ul>
+            container = responsibilities_heading.find_parent("p") or responsibilities_heading 
+            ul = container.find_next_sibling("ul")
             if ul:
-                return [li.get_text(strip=True) for li in ul.find_all("li")]
+                cleaned_resp = self.bleach_clean(ul)
+                return cleaned_resp or [li.get_text(strip=True) for li in ul.find_all("li")]
+        # Fallback to text section scan
         resp =  self.get_section_by_keywords(soup, ["responsibilit", "what you'll do", "you will do"])
         if resp:
-            return resp
+            cleaned_resp = self.bleach_clean(resp)
+            return cleaned_resp.strip() or resp
         return []
 
     def get_requirements(self,soup):
         """
         Extracts the requirements section from HTML.
         """
+        
         requirements_heading = soup.find(lambda tag: tag.name in ["h2", "h3"] and "requirements" in tag.get_text(strip=True).lower())
         if requirements_heading:
             ul = requirements_heading.find_next_sibling("ul")
             if ul:
                 return [li.get_text(strip=True) for li in ul.find_all("li")]
-        return self.get_section_by_keywords(soup, ["requirement", "qualifications", "experience"])
+        # return self.get_section_by_keywords(soup, ["requirement", "qualifications", "experience"])
+        requirements_heading = self.get_section_by_keywords(soup, ["requirement", "qualifications", "experience"])
+        return self.bleach_clean(requirements_heading) or requirements_heading
         return []
-
+    def plain_text(self,html):
+        return BeautifulSoup(html or "", "html.parser").get_text(separator=" ", strip=True).lower()
     def extract_metadata(self) -> dict:
         self.driver.get(self.url)  # ✅ self.url is passed in the constructor
         html = self.driver.page_source
@@ -346,7 +443,8 @@ class ComeetValidator(BaseValidator):
             location = location or gpt_result.get("location")
             posted_date = posted_date or gpt_result.get("posted_date")
 
-            
+
+
               # 🧠 Special retry: if location is still missing or unclear
             if not location:
                 retry_prompt = """
@@ -376,15 +474,33 @@ class ComeetValidator(BaseValidator):
         # Step 3: Filter out non-Israel jobs
         if not location or "israel" not in location.lower() and 'il' not in location.lower():
             logger.warning(f"❌ Location not in israel: {location}")
+        
+        # job_preview = summarize_job_description(company, title, description)
+                    #check for duplications:
+        
+        # bb = self.extract_text_from_gpt(html)
+        # print(f"GPT extracted: {bb}")
 
+
+        desc_text = self.plain_text(description)
+        resp_text = self.plain_text(responsibilities)
+        reqs_text = self.plain_text(requirements)
+    #remove duplicates
+        final = {
+            "description": description,
+            "responsibilities": None if resp_text and resp_text in desc_text else responsibilities,
+            "requirements": None if reqs_text and reqs_text in desc_text else requirements,
+        }
+        print(f"Final fields: {final}")
         job_data = {
+            
             "title": title,
             "company": company,
             "location": location,
             "posted_date": posted_date,
             "description": description,
-            "responsibilities": responsibilities,
-            "requirements":    requirements,
+            "responsibilities": None if resp_text and resp_text in desc_text else responsibilities,
+            "requirements":    None if reqs_text and reqs_text in desc_text else requirements,
         }
 
         return job_data
