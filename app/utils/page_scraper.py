@@ -60,11 +60,11 @@ def extract_visible_text_from_url(url: str, max_length: int = 4000) -> str:
         text = soup.get_text(separator="\n").strip()
         lines = text.splitlines()
         non_empty_lines = [line.strip() for line in lines if line.strip()]  # remove empty/whitespace-only lines
-        no_saces_text =  "\n".join(non_empty_lines)
+        no_spaces_text =  "\n".join(non_empty_lines)
         
         return {
             "metadata": metadata,
-            "visible_text": no_saces_text,
+            "visible_text": no_spaces_text,
             "html": html  # Optional: you can remove this if not needed
         }   # If JSON parsing fails, return the cleaned text
             
