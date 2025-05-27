@@ -53,7 +53,6 @@ Here's the page content:
     except Exception as e:
         print(f"❌ GPT fallback failed: {e}")
         return {}
-        return {}
 
 
 
