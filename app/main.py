@@ -102,10 +102,6 @@ def extract_job_data(job_html_or_text: str) -> dict:
 
     return response.choices[0].message.content  # This will be a JSON string
 
-    return { "message": "Welcome to the Job Validator API!" }
-
-
-
 ###For testing only
 
 # def get_db():
