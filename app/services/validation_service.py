@@ -35,16 +35,16 @@ class JobValidatorService:
         Validate pending jobs in the database.
         """
 
-        # pending_jobs = self.db.query(JobPost).filter(
-        #     JobPost.validated.is_(False),
-        #     JobPost.status == "pending",
-        #     JobPost.link.contains("comeet"),
-        # ).limit(2).all()
+        pending_jobs = self.db.query(JobPost).filter(
+            JobPost.validated.is_(False),
+            JobPost.status == "pending",
+            JobPost.link.contains("comeet"),
+        ).limit(2).all()
 
         
-        pending_jobs = self.db.query(JobPost).filter(
-            JobPost.link == "https://www.comeet.com/jobs/drivenets/72.006/full-stack-team-leader-node_js--react/A1.456"
-        ).limit(2).all()
+        # pending_jobs = self.db.query(JobPost).filter(
+        #     JobPost.link == "https://www.comeet.com/jobs/drivenets/72.006/full-stack-team-leader-node_js--react/A1.456"
+        # ).limit(2).all()
 
         if not pending_jobs:
             logger.error("No pending jobs to validate.")
