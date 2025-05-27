@@ -83,7 +83,7 @@ def extract_job_data(job_html_or_text: str) -> dict:
     - requirements
     - seniority_level
     - employment_type
-    -required expreience years
+    - required experience years
     - salary    
     - job_link
 
