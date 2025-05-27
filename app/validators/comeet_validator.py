@@ -196,12 +196,7 @@ class ComeetValidator(BaseValidator):
         """
         Extracts the job location from JSON-LD or HTML. <span ng-if="getLocationName(position.location)" class="">Tel Aviv-Yafo, Tel Aviv District, IL</span>
         """
-        if json_ld:
-            job_location = json_ld.get("jobLocation", {})
-            if isinstance(job_location, dict):
-                address = job_location.get("address", {})
-                if isinstance(address, dict) and address:
-                    return address.get("addressLocality")
+        
 
          # Try 2: positionDetails with icon
         ul = soup.find("ul", class_="positionDetails")
@@ -226,6 +221,12 @@ class ComeetValidator(BaseValidator):
         if spans:
             location_text = spans[0].get_text(strip=True)
             return location_text
+        if json_ld:
+            job_location = json_ld.get("jobLocation", {})
+            if isinstance(job_location, dict):
+                address = job_location.get("address", {})
+                if isinstance(address, dict) and address:
+                    return address.get("addressLocality")
         return None
 
     def get_posted_date(self,json_ld):
