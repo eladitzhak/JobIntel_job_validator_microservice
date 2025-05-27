@@ -29,6 +29,7 @@ class JobValidatorService:
         path_parts = urlparse(url).path.strip('/').split('/')
         if len(path_parts) == 3:
             return True
+        return False
         
     def validate_pending_jobs(self):
         """
@@ -68,8 +69,8 @@ class JobValidatorService:
                         job.status = "no validator error"
                         job.validated_date = datetime.now(self.israel_tz)
                     continue
-                if (isCompanyPage := self.is_company_page(job.link)) is not None:
-                    logger.info(f"Company page detected: {isCompanyPage}")
+                if (self.is_company_page(job.link)):
+                    logger.info(f"Company page detected in: {job.link}")
                     with commit_or_rollback(self.db, job):
                         job.status = "company page"
                         job.validated_date = datetime.now(self.israel_tz)
