@@ -15,6 +15,7 @@ class JobPost(Base):
     title = Column(String, nullable=False)
     snippet = Column(String)
     link = Column(String, unique=True)
+    original_link = Column(String, nullable=True)  # Keep original link if different
     posted_time = Column(DateTime)
     scraped_at = Column(DateTime, default=datetime.utcnow)
     keywords = Column(ARRAY(String))  # Use ARRAY for PostgreSQL

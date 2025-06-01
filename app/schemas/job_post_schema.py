@@ -20,6 +20,7 @@ class JobPostUpdate(BaseModel):
     requirements: Optional[str] =  None
     responsibilities: Optional[str] =  None
     keywords: Optional[List[str]] =  None
+    link: Optional[str] = None  
 
     @field_validator("description", "requirements", "responsibilities", mode="before")
     @classmethod

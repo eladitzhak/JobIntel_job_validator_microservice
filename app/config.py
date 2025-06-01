@@ -18,6 +18,8 @@ class Settings(BaseSettings):
 
     openai_api_key: str = Field(..., alias="OPENAI_API_KEY")
 
+    opencage_api_key: str = Field(..., alias="OPENCAGE_API_KEY")
+
     class Config:
         env_file = ".env"
 

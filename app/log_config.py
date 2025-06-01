@@ -20,7 +20,7 @@ logger.add(
 )
 
 # File output (rotates at 10 MB, retains 7 days, compressed)
-log_file_path = os.path.join(log_dir, "job_scraper.log")
+log_file_path = os.path.join(log_dir, "job_validator.log")
 
 logger.add(
     "logs/job_scraper.log",

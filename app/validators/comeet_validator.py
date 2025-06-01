@@ -3,6 +3,7 @@ from datetime import datetime
 from urllib.parse import urlparse
 import re
 from selenium import webdriver
+from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
@@ -10,7 +11,6 @@ from selenium.webdriver.support import expected_conditions as EC
 from bs4 import BeautifulSoup
 from app.log_config import logger
 from selenium.webdriver.chrome.webdriver import WebDriver
-from bs4 import BeautifulSoup
 from app.services.gpt_fallback import gpt_extract_job_metadata_from_html, summarize_job_description
 from datetime import datetime
 import pytz
@@ -19,6 +19,9 @@ import json
 import bleach
 
 from app.validators.base import BaseValidator
+from app.utils.location_utils import is_location_in_israel
+from app.exceptions.exceptions import LocationValidationError
+
 
 WAIT_TIME_TO_LOAD_PAGE = 15  # seconds
 EXPECTED_SELECTOR = "h1, button"
@@ -85,16 +88,44 @@ class ComeetValidator(BaseValidator):
             return False
 
     def validate(self) -> bool:
+        """
+        Validates whether the Comeet URL is a real job post, not just a company landing page by waiting for apply button.
+        Returns True if a real job is detected, False otherwise.
+        Sets error_reason and job_status accordingly.
+        """
         try:
             self.driver.get(self.url)
             # Wait for job title or apply button
             self.wait.until(
                 EC.presence_of_element_located((By.CSS_SELECTOR, "button")) #h1, button
             )
-            return True
+        except TimeoutException:
+              # ✅ Check if the current URL is a generic company page (e.g., /jobs/wiz)
+            if self.url_is_company_page(self.driver.current_url):
+                logger.warning(f"❌ Timeout: Job page did not load properly: {self.url} its comapny page?")
+                self.job_status = "company page"
+                self.error_reason = "Comeet company page detected"
+            else:
+                self.job_status = "error"
+                self.error_reason = "Timeout while waiting for job apply button and not etected company page"
+                logger.error(f"❌ Timeout: Job page did not load properly: {self.url} and company page not detected in {self.driver.current_url}")
+            return False
+            
         except Exception as e:
             logger.error(f"Comeet Validation error while waiting for button to appear in job page: {e}")
+            self.job_status = "error"
+            self.error_reason = f"Comeet Validation error: {e}"
             return False
+        
+        # Step 4: If button appeared, still confirm it's not a company page
+        if self.url_is_company_page(self.driver.current_url):
+            self.job_status = "company page"
+            self.error_reason = "Comeet company page detected"
+            logger.warning(f"❌ Comeet company page detected (normal): original url: {self.url} driver url after open page --> {self.driver.current_url}")
+            return False
+        
+        return True
+        
 
     def normalize_location(self, location_str: str) -> str:
         """
@@ -389,6 +420,9 @@ class ComeetValidator(BaseValidator):
         title = self.get_title(soup, json_ld)
         company = self.get_company(soup, json_ld, self.url)
         location = self.get_location(soup, json_ld)
+        if (self.set_job_status_and_reason_if_not_israel(location)):
+            raise LocationValidationError(location)
+
         posted_date = self.get_posted_date(json_ld)
         description = self.get_description(soup, json_ld)
         responsibilities = self.get_responsibilities(soup)
@@ -472,10 +506,9 @@ class ComeetValidator(BaseValidator):
                 ) / 1000
                 print(f"💵 GPT used: {usage['total_tokens']} tokens → ${gpt_cost_usd:.5f}")
 
-        # Step 3: Filter out non-Israel jobs
-        if not location or "israel" not in location.lower() and 'il' not in location.lower():
-            logger.warning(f"❌ Location not in israel: {location}")
-        
+        if 'location' in missing_fields and self.set_job_status_and_reason_if_not_israel(location):
+            raise LocationValidationError(location)
+            return {}
         # job_preview = summarize_job_description(company, title, description)
                     #check for duplications:
         
@@ -498,11 +531,12 @@ class ComeetValidator(BaseValidator):
             "title": title,
             "company": company,
             "location": location,
-            "posted_date": posted_date,
+            "posted_time": posted_date,
             "description": description,
             "responsibilities": None if resp_text and resp_text in desc_text else responsibilities,
             "requirements":    None if reqs_text and reqs_text in desc_text else requirements,
         }
+        
 
         return job_data
         # ✅ New helper for fallback
@@ -585,3 +619,20 @@ class ComeetValidator(BaseValidator):
             "responsibilities": responsibilities,
             "requirements": requirements,
         }
+
+    def url_is_company_page(self, url: str) -> bool:
+        
+        """
+        Default logic to check if the URL is likely a company landing page.
+        Can be overridden by each validator.
+
+        Example: Comeet URLs with only 3 path parts like:
+        /jobs/company-name/title/id → probably job page
+        /jobs/company-name → probably company page
+        """
+        # Example logic: check if the URL contains "company"
+        # Check URL pattern
+        path_parts = urlparse(url).path.strip('/').split('/')
+        if len(path_parts) == 3:
+            return True
+        return False
