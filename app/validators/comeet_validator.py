@@ -102,7 +102,7 @@ class ComeetValidator(BaseValidator):
         except TimeoutException:
               # ✅ Check if the current URL is a generic company page (e.g., /jobs/wiz)
             if self.url_is_company_page(self.driver.current_url):
-                logger.warning(f"❌ Timeout: Job page did not load properly: {self.url} its comapny page?")
+                logger.warning(f"❌ Timeout: Job page did not load properly: {self.url} its company page?")
                 self.job_status = "company page"
                 self.error_reason = "Comeet company page detected"
             else:
@@ -407,7 +407,6 @@ class ComeetValidator(BaseValidator):
         # return self.get_section_by_keywords(soup, ["requirement", "qualifications", "experience"])
         requirements_heading = self.get_section_by_keywords(soup, ["requirement", "qualifications", "experience"])
         return self.bleach_clean(requirements_heading) or requirements_heading
-        return []
     def plain_text(self,html):
         return BeautifulSoup(html or "", "html.parser").get_text(separator=" ", strip=True).lower()
     def extract_metadata(self) -> dict:
