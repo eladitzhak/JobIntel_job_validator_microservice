@@ -58,8 +58,8 @@ def is_location_in_israel(location: Optional[str]) -> bool:
         if not data.get("results"):
             # OpenCage returned OK, but couldn't resolve location → use GPT fallback
             logger.info(f"🌍 OpenCage returned no results for '{location}' fallback to chatgpt")
-            is_location_in_israel = classify_location_with_gpt(location)
-            if is_location_in_israel:
+            gpt_result = classify_location_with_gpt(location)
+            if gpt_result:
                 logger.info(f"📍 GPT classified location '{location}' as in Israel.")
                 return True
             else:
