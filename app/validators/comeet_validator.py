@@ -107,7 +107,7 @@ class ComeetValidator(BaseValidator):
                 self.error_reason = "Comeet company page detected"
             else:
                 self.job_status = "error"
-                self.error_reason = "Timeout while waiting for job apply button and not etected company page"
+                self.error_reason = "Timeout while waiting for job apply button and not detected company page"
                 logger.error(f"❌ Timeout: Job page did not load properly: {self.url} and company page not detected in {self.driver.current_url}")
             return False
             
