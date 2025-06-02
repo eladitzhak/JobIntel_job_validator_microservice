@@ -507,7 +507,6 @@ class ComeetValidator(BaseValidator):
 
         if 'location' in missing_fields and self.set_job_status_and_reason_if_not_israel(location):
             raise LocationValidationError(location)
-            return {}
         # job_preview = summarize_job_description(company, title, description)
                     #check for duplications:
         
