@@ -94,7 +94,7 @@ class BaseValidator(ABC):
         Args:
             location (str): The job location to check.
         Returns:
-            bool: True if the location is not in israel, False otherwise (also fir empty location).
+            bool: True if the location is not in israel, False otherwise (also for empty location).
         """
         if location and not is_location_in_israel(location):
             self.error_reason = f"Job location '{location}' is not in Israel"
