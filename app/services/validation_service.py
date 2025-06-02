@@ -42,8 +42,8 @@ class JobValidatorService:
         pending_jobs = self.db.query(JobPost).filter(
             JobPost.validated.is_(False),
             JobPost.status == "pending",
-            # (JobPost.link.contains("greenhouse") | JobPost.link.contains("comeet")),
-            JobPost.link.contains("greenhouse"),
+            JobPost.link.contains("greenhouse") | JobPost.link.contains("comeet"),
+            # Updated filter to include both "greenhouse" and "comeet" links
         ).limit(2).all()
 
         # pending_jobs = self.db.query(JobPost).filter(
