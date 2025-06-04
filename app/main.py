@@ -1,8 +1,3 @@
-# import os
-# from dotenv import load_dotenv
-# load_dotenv()
-# print("ENV FILE FOUND?", os.path.exists(".env"))
-# print("DATABASE_URL =", os.getenv("DATABASE_URL"))
 import os
 from dotenv import load_dotenv
 from openai import OpenAI
